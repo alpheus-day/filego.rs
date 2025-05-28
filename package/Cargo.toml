@@ -1,6 +1,6 @@
 [package]
 name = "filego"
-version = "0.5.3"
+version = "0.5.4"
 authors = ["Alpheus Tang"]
 edition = "2024"
 rust-version = "1.85.0"
@@ -42,7 +42,7 @@ features = ["fs", "io-util"]
 
 [features]
 default = []
-async-std = ["dep:async-std"]
-async_std = ["async-std"]
+async_std = ["dep:async-std"]
+async-std = ["async_std"]
 tokio = ["dep:tokio"]
-all = ["async-std", "tokio"]
+all = ["async_std", "tokio"]

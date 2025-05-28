@@ -6,15 +6,15 @@ use std::{
 
 use crate::{BUFFER_CAPACITY_MAX_DEFAULT, CHUNK_SIZE_DEFAULT};
 
-/// Run asynchronously with `async-std`/`async_std` feature.
+/// Run asynchronously with `async_std` feature.
 ///
 /// To use it, add the following code to the `Cargo.toml` file:
 ///
 /// ```toml
 /// [dependencies]
-/// filego = { version = "*", features = ["async-std"] }
+/// filego = { version = "*", features = ["async_std"] }
 /// ```
-#[cfg(feature = "async-std")]
+#[cfg(feature = "async_std")]
 pub mod async_std {
     pub use crate::async_std::split::SplitAsyncExt;
 }

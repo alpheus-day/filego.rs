@@ -1,3 +1,9 @@
+## 0.5.4 (2025-05-28)
+
+### What's Changed
+
+- Update documentation
+
 ## 0.5.3 (2025-03-12)
 
 ### What's Changed

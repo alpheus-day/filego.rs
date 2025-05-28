@@ -18,10 +18,10 @@
 //!     .unwrap();
 //! ```
 //!
-//! Async version also available with the `async-std` and `tokio` features:
+//! Async version also available with the `async_std` and `tokio` features:
 //!
 //! ```no_run
-//! // This is a `async-std` example
+//! // This is a `async_std` example
 //!
 //! use async_std::path::PathBuf;
 //!
@@ -71,8 +71,8 @@ pub mod check;
 /// Merge module.
 pub mod merge;
 
-/// Functions implemented with `async-std`.
-#[cfg(feature = "async-std")]
+/// Functions implemented with `async_std`.
+#[cfg(feature = "async_std")]
 pub(crate) mod async_std;
 
 /// Functions implemented with `tokio`.

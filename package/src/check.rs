@@ -3,15 +3,15 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// Run asynchronously with `async-std`/`async_std` feature.
+/// Run asynchronously with `async_std` feature.
 ///
 /// To use it, add the following code to the `Cargo.toml` file:
 ///
 /// ```toml
 /// [dependencies]
-/// filego = { version = "*", features = ["async-std"] }
+/// filego = { version = "*", features = ["async_std"] }
 /// ```
-#[cfg(feature = "async-std")]
+#[cfg(feature = "async_std")]
 pub mod async_std {
     pub use crate::async_std::check::CheckAsyncExt;
 }

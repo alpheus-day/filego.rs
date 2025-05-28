@@ -26,10 +26,10 @@ let result: SplitResult = Split::new()
     .unwrap();
 ```
 
-Async version also available with the `async-std`/`async_std` and `tokio` features:
+Async version also available with the `async_std` and `tokio` features:
 
 ```rust
-// This is a `async-std` example
+// This is a `async_std` example
 
 use async_std::path::PathBuf;
 
