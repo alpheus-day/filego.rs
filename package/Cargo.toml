@@ -31,10 +31,6 @@ include = [
 [package.metadata.docs.rs]
 features = ["all"]
 
-[lib]
-name = "filego"
-path = "src/lib.rs"
-
 [dependencies.async-std]
 workspace = true
 optional = true
