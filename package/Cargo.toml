@@ -8,8 +8,8 @@ description = """
 A file splitting & merging solution
 """
 readme = "README.md"
-homepage = "https://github.com/alpheus-day/filego.rs"
-repository = "https://github.com/alpheus-day/filego.rs"
+homepage = "https://github.com/alpheusday/filego.rs"
+repository = "https://github.com/alpheusday/filego.rs"
 license = "MIT"
 keywords = [
     "split",
