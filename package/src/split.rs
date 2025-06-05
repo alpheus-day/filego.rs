@@ -1,6 +1,6 @@
 use std::{
-    fs,
-    io::{self as io, Read as _, Write as _},
+    fs::{self, File},
+    io::{self as io, BufWriter, Read as _, Write as _},
     path::{Path, PathBuf},
 };
 
@@ -127,7 +127,7 @@ impl Split {
     pub fn run(&self) -> io::Result<SplitResult> {
         let in_file: &Path = match self.in_file {
             | Some(ref p) => {
-                let p: &Path = p.as_ref();
+                let p: &Path = p.as_path();
 
                 // if in_file not exists
                 if !p.exists() {
@@ -157,7 +157,7 @@ impl Split {
 
         let out_dir: &Path = match self.out_dir {
             | Some(ref p) => {
-                let p: &Path = p.as_ref();
+                let p: &Path = p.as_path();
 
                 // if out_dir not exists
                 if !p.exists() {
@@ -198,62 +198,39 @@ impl Split {
 
         let mut total_chunks: usize = 0;
 
-        let mut current: usize = 0;
-
         loop {
-            let read: usize = reader.read(&mut buffer[current..])?;
+            let mut offset: usize = 0;
 
-            if read == 0 {
-                if current > 0 {
-                    // write the remaining data
-                    let output_path: PathBuf =
-                        out_dir.join(total_chunks.to_string());
+            while offset < chunk_size {
+                let bytes_read: usize = reader.read(&mut buffer[offset..])?;
 
-                    let output: fs::File = fs::OpenOptions::new()
-                        .create(true)
-                        .truncate(true)
-                        .write(true)
-                        .open(output_path)?;
-
-                    let mut writer: io::BufWriter<fs::File> =
-                        io::BufWriter::with_capacity(buffer_capacity, output);
-
-                    writer.write_all(&buffer[..current])?;
-
-                    writer.flush()?;
-
-                    total_chunks += 1;
+                if bytes_read == 0 {
+                    break;
                 }
 
+                offset += bytes_read;
+            }
+
+            if offset == 0 {
                 break;
             }
 
-            current += read;
+            let output_path: PathBuf = out_dir.join(total_chunks.to_string());
 
-            if current >= chunk_size {
-                // write chunk
-                let output_path: PathBuf =
-                    out_dir.join(total_chunks.to_string());
+            let output: File = fs::OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .open(output_path)?;
 
-                let output: fs::File = fs::OpenOptions::new()
-                    .create(true)
-                    .truncate(true)
-                    .write(true)
-                    .open(output_path)?;
+            let mut writer: BufWriter<File> =
+                io::BufWriter::with_capacity(buffer_capacity, output);
 
-                let mut writer: io::BufWriter<fs::File> =
-                    io::BufWriter::with_capacity(buffer_capacity, output);
+            writer.write_all(&buffer[..offset])?;
 
-                writer.write_all(&buffer[..chunk_size])?;
+            writer.flush()?;
 
-                writer.flush()?;
-
-                total_chunks += 1;
-
-                // move remaining data to the start of the buffer
-                buffer.copy_within(chunk_size..current, 0);
-                current -= chunk_size;
-            }
+            total_chunks += 1;
         }
 
         Ok(SplitResult { file_size, total_chunks })

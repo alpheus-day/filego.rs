@@ -129,5 +129,13 @@ fn bench_merge(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_split, bench_check, bench_merge,);
+criterion_group!(
+    benches,
+    // split
+    bench_split,
+    // check
+    bench_check,
+    // merge
+    bench_merge,
+);
 criterion_main!(benches);

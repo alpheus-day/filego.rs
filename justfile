@@ -25,7 +25,7 @@ fmt:
 
 # Run test
 test:
-    cargo test -p tests
+    cargo test -p tests -- --nocapture
 
 # Run benchmark
 bench:

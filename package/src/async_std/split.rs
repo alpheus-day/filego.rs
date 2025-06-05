@@ -1,6 +1,6 @@
 use async_std::{
-    fs,
-    io::{self, ReadExt as _, WriteExt as _},
+    fs::{self, File},
+    io::{self, BufWriter, ReadExt as _, WriteExt as _},
     path::{Path, PathBuf},
 };
 
@@ -89,64 +89,41 @@ impl SplitAsyncExt for Split {
 
         let mut total_chunks: usize = 0;
 
-        let mut current: usize = 0;
-
         loop {
-            let read: usize = reader.read(&mut buffer[current..]).await?;
+            let mut offset: usize = 0;
 
-            if read == 0 {
-                if current > 0 {
-                    // write the remaining data
-                    let output_path: PathBuf =
-                        out_dir.join(total_chunks.to_string());
+            while offset < chunk_size {
+                let bytes_read: usize =
+                    reader.read(&mut buffer[offset..]).await?;
 
-                    let output: fs::File = fs::OpenOptions::new()
-                        .create(true)
-                        .truncate(true)
-                        .write(true)
-                        .open(output_path)
-                        .await?;
-
-                    let mut writer: io::BufWriter<fs::File> =
-                        io::BufWriter::with_capacity(buffer_capacity, output);
-
-                    writer.write_all(&buffer[..current]).await?;
-
-                    writer.flush().await?;
-
-                    total_chunks += 1;
+                if bytes_read == 0 {
+                    break;
                 }
 
+                offset += bytes_read;
+            }
+
+            if offset == 0 {
                 break;
             }
 
-            current += read;
+            let output_path: PathBuf = out_dir.join(total_chunks.to_string());
 
-            if current >= chunk_size {
-                // write chunk
-                let output_path: PathBuf =
-                    out_dir.join(total_chunks.to_string());
+            let output: File = fs::OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .open(output_path)
+                .await?;
 
-                let output: fs::File = fs::OpenOptions::new()
-                    .create(true)
-                    .truncate(true)
-                    .write(true)
-                    .open(output_path)
-                    .await?;
+            let mut writer: BufWriter<File> =
+                io::BufWriter::with_capacity(buffer_capacity, output);
 
-                let mut writer: io::BufWriter<fs::File> =
-                    io::BufWriter::with_capacity(buffer_capacity, output);
+            writer.write_all(&buffer[..offset]).await?;
 
-                writer.write_all(&buffer[..chunk_size]).await?;
+            writer.flush().await?;
 
-                writer.flush().await?;
-
-                total_chunks += 1;
-
-                // move remaining data to the start of the buffer
-                buffer.copy_within(chunk_size..current, 0);
-                current -= chunk_size;
-            }
+            total_chunks += 1;
         }
 
         Ok(SplitResult { file_size, total_chunks })
