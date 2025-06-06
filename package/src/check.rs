@@ -1,5 +1,5 @@
 use std::{
-    fs, io,
+    fs,
     path::{Path, PathBuf},
 };
 
@@ -82,6 +82,55 @@ pub struct CheckResult {
     pub error: Option<CheckResultError>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CheckError {
+    InDirNotFound,
+    InDirNotDir,
+    InDirNotSet,
+    InFileNotOpened,
+    InFileNotRead,
+    FileSizeNotSet,
+    TotalChunksNotSet,
+}
+
+impl CheckError {
+    /// Get the code of the error as `&str`.
+    pub fn as_code(&self) -> &str {
+        match self {
+            | Self::InDirNotFound => "in_dir_not_found",
+            | Self::InDirNotDir => "in_dir_not_dir",
+            | Self::InDirNotSet => "in_dir_not_set",
+            | Self::InFileNotOpened => "in_file_not_opened",
+            | Self::InFileNotRead => "in_file_not_read",
+            | Self::FileSizeNotSet => "file_size_not_set",
+            | Self::TotalChunksNotSet => "total_chunks_not_set",
+        }
+    }
+
+    /// Get the code of the error as `String`.
+    pub fn to_code(&self) -> String {
+        self.as_code().to_string()
+    }
+
+    /// Get the message of the error as `&str`.
+    pub fn as_message(&self) -> &str {
+        match self {
+            | Self::InDirNotFound => "The input directory not found.",
+            | Self::InDirNotDir => "The input directory is not a directory.",
+            | Self::InDirNotSet => "The input directory is not set.",
+            | Self::InFileNotOpened => "The input file could not be opened.",
+            | Self::InFileNotRead => "The input file could not be read.",
+            | Self::FileSizeNotSet => "The `file_size` is not set.",
+            | Self::TotalChunksNotSet => "The `total_chunks` is not set.",
+        }
+    }
+
+    /// Get the message of the error as `String`.
+    pub fn to_message(&self) -> String {
+        self.as_message().to_string()
+    }
+}
+
 /// Process to check the file integrity.
 ///
 /// The function will return [`CheckResult`] (that may come
@@ -129,7 +178,7 @@ impl Check {
         self
     }
 
-    /// Set the size of the original file.
+    /// Set the size of the original file in bytes.
     pub fn file_size(
         mut self,
         size: usize,
@@ -148,55 +197,34 @@ impl Check {
     }
 
     /// Run the check process.
-    pub fn run(&self) -> io::Result<CheckResult> {
+    pub fn run(&self) -> Result<CheckResult, CheckError> {
         let in_dir: &Path = match self.in_dir {
             | Some(ref p) => {
                 let p: &Path = p.as_ref();
 
                 // if in_dir not exists
                 if !p.exists() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::NotFound,
-                        "in_dir path not found",
-                    ));
+                    return Err(CheckError::InDirNotFound);
                 }
 
                 // if in_dir not a directory
                 if !p.is_dir() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "in_dir is not a directory",
-                    ));
+                    return Err(CheckError::InDirNotDir);
                 }
 
                 p
             },
-            | None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "in_dir is not set",
-                ));
-            },
+            | None => return Err(CheckError::InDirNotSet),
         };
 
         let file_size: usize = match self.file_size {
             | Some(s) => s,
-            | None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "file_size is not set",
-                ));
-            },
+            | None => return Err(CheckError::FileSizeNotSet),
         };
 
         let total_chunks: usize = match self.total_chunks {
             | Some(s) => s,
-            | None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "total_chunks is not set",
-                ));
-            },
+            | None => return Err(CheckError::TotalChunksNotSet),
         };
 
         let mut actual_size: usize = 0;
@@ -210,11 +238,14 @@ impl Check {
                 continue;
             }
 
-            actual_size += fs::OpenOptions::new()
-                .read(true)
-                .open(&target_file)?
-                .metadata()?
-                .len() as usize;
+            actual_size +=
+                match fs::OpenOptions::new().read(true).open(&target_file) {
+                    | Ok(f) => match f.metadata() {
+                        | Ok(m) => m.len() as usize,
+                        | Err(_) => return Err(CheckError::InFileNotRead),
+                    },
+                    | Err(_) => return Err(CheckError::InFileNotOpened),
+                }
         }
 
         if !missing.is_empty() {

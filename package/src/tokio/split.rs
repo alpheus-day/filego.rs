@@ -5,46 +5,35 @@ use tokio::{
     io::{self, AsyncReadExt, AsyncWriteExt, BufWriter},
 };
 
-use crate::split::{Split, SplitResult};
+use crate::split::{Split, SplitError, SplitResult};
 
 /// Trait for running the split process.
 pub trait SplitAsyncExt {
     /// Run the split process asynchronously.
     fn run_async(
         &self
-    ) -> impl std::future::Future<Output = io::Result<SplitResult>> + Send;
+    ) -> impl std::future::Future<Output = Result<SplitResult, SplitError>> + Send;
 }
 
 impl SplitAsyncExt for Split {
-    async fn run_async(&self) -> io::Result<SplitResult> {
+    async fn run_async(&self) -> Result<SplitResult, SplitError> {
         let in_file: &Path = match self.in_file {
             | Some(ref p) => {
                 let p: &Path = p.as_ref();
 
                 // if in_file not exists
                 if !p.exists() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::NotFound,
-                        "in_file path not found",
-                    ));
+                    return Err(SplitError::InFileNotFound);
                 }
 
                 // if in_file not a file
                 if !p.is_file() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "in_file is not a path to file",
-                    ));
+                    return Err(SplitError::InFileNotFile);
                 }
 
                 p
             },
-            | None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "in_file is not set",
-                ));
-            },
+            | None => return Err(SplitError::InFileNotSet),
         };
 
         let out_dir: &Path = match self.out_dir {
@@ -53,25 +42,19 @@ impl SplitAsyncExt for Split {
 
                 // if out_dir not exists
                 if !p.exists() {
-                    fs::create_dir_all(&p).await?;
+                    if fs::create_dir_all(p).await.is_err() {
+                        return Err(SplitError::OutDirNotDir);
+                    }
                 } else {
                     // if out_dir not a directory
                     if p.is_file() {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "out_dir is not a directory",
-                        ));
+                        return Err(SplitError::OutDirNotDir);
                     }
                 }
 
                 p
             },
-            | None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "out_dir is not set",
-                ));
-            },
+            | None => return Err(SplitError::OutDirNotSet),
         };
 
         let chunk_size: usize = self.chunk_size;
@@ -79,9 +62,15 @@ impl SplitAsyncExt for Split {
         let buffer_capacity: usize = chunk_size.min(self.cap_max);
 
         let input: fs::File =
-            fs::OpenOptions::new().read(true).open(in_file).await?;
+            match fs::OpenOptions::new().read(true).open(in_file).await {
+                | Ok(f) => f,
+                | Err(_) => return Err(SplitError::InFileNotOpened),
+            };
 
-        let file_size: usize = input.metadata().await?.len() as usize;
+        let file_size: usize = match input.metadata().await {
+            | Ok(m) => m.len() as usize,
+            | Err(_) => return Err(SplitError::InFileNotRead),
+        };
 
         let mut reader: io::BufReader<fs::File> =
             io::BufReader::with_capacity(buffer_capacity, input);
@@ -95,7 +84,10 @@ impl SplitAsyncExt for Split {
 
             while offset < chunk_size {
                 let bytes_read: usize =
-                    reader.read(&mut buffer[offset..]).await?;
+                    match reader.read(&mut buffer[offset..]).await {
+                        | Ok(n) => n,
+                        | Err(_) => return Err(SplitError::InFileNotRead),
+                    };
 
                 if bytes_read == 0 {
                     break;
@@ -110,19 +102,27 @@ impl SplitAsyncExt for Split {
 
             let output_path: PathBuf = out_dir.join(total_chunks.to_string());
 
-            let output: File = fs::OpenOptions::new()
+            let output: File = match fs::OpenOptions::new()
                 .create(true)
                 .truncate(true)
                 .write(true)
                 .open(output_path)
-                .await?;
+                .await
+            {
+                | Ok(f) => f,
+                | Err(_) => return Err(SplitError::OutFileNotOpened),
+            };
 
             let mut writer: BufWriter<File> =
                 io::BufWriter::with_capacity(buffer_capacity, output);
 
-            writer.write_all(&buffer[..offset]).await?;
+            if writer.write_all(&buffer[..offset]).await.is_err() {
+                return Err(SplitError::OutFileNotWritten);
+            }
 
-            writer.flush().await?;
+            if writer.flush().await.is_err() {
+                return Err(SplitError::OutFileNotWritten);
+            }
 
             total_chunks += 1;
         }

@@ -1,6 +1,6 @@
 [package]
 name = "filego"
-version = "0.5.4"
+version = "0.6.0"
 authors = ["Alpheus Tang"]
 edition = "2024"
 rust-version = "1.85.0"

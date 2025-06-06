@@ -1,3 +1,15 @@
+## 0.6.0
+
+### Breaking Changes
+
+- Update in returned errors
+
+### What's New
+
+- Add `SplitError`
+- Add `CheckError`
+- Add `MergeError`
+
 ## 0.5.4 (2025-05-28)
 
 ### What's Changed

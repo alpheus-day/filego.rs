@@ -1,9 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use tokio::{fs, io};
+use tokio::fs;
 
 use crate::check::{
-    Check, CheckResult, CheckResultError, CheckResultErrorType,
+    Check, CheckError, CheckResult, CheckResultError, CheckResultErrorType,
 };
 
 /// Trait for running the check process.
@@ -11,59 +11,38 @@ pub trait CheckAsyncExt {
     /// Run the check process asynchronously.
     fn run_async(
         &self
-    ) -> impl std::future::Future<Output = io::Result<CheckResult>> + Send;
+    ) -> impl std::future::Future<Output = Result<CheckResult, CheckError>> + Send;
 }
 
 impl CheckAsyncExt for Check {
-    async fn run_async(&self) -> io::Result<CheckResult> {
+    async fn run_async(&self) -> Result<CheckResult, CheckError> {
         let in_dir: &Path = match self.in_dir {
             | Some(ref p) => {
                 let p: &Path = p.as_ref();
 
                 // if in_dir not exists
                 if !p.exists() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::NotFound,
-                        "in_dir path not found",
-                    ));
+                    return Err(CheckError::InDirNotFound);
                 }
 
                 // if in_dir not a directory
                 if !p.is_dir() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "in_dir is not a directory",
-                    ));
+                    return Err(CheckError::InDirNotDir);
                 }
 
                 p
             },
-            | None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "in_dir is not set",
-                ));
-            },
+            | None => return Err(CheckError::InDirNotSet),
         };
 
         let file_size: usize = match self.file_size {
             | Some(s) => s,
-            | None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "file_size is not set",
-                ));
-            },
+            | None => return Err(CheckError::FileSizeNotSet),
         };
 
         let total_chunks: usize = match self.total_chunks {
             | Some(s) => s,
-            | None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "total_chunks is not set",
-                ));
-            },
+            | None => return Err(CheckError::TotalChunksNotSet),
         };
 
         let mut actual_size: usize = 0;
@@ -77,13 +56,15 @@ impl CheckAsyncExt for Check {
                 continue;
             }
 
-            actual_size += fs::OpenOptions::new()
-                .read(true)
-                .open(&target_file)
-                .await?
-                .metadata()
-                .await?
-                .len() as usize;
+            actual_size +=
+                match fs::OpenOptions::new().read(true).open(&target_file).await
+                {
+                    | Ok(f) => match f.metadata().await {
+                        | Ok(m) => m.len() as usize,
+                        | Err(_) => return Err(CheckError::InFileNotRead),
+                    },
+                    | Err(_) => return Err(CheckError::InFileNotOpened),
+                }
         }
 
         if !missing.is_empty() {
